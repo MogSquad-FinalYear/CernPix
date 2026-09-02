@@ -3,48 +3,21 @@ import path from "path";
 import { NextResponse } from "next/server";
 
 import { detectImages, fetchDetectionHistory } from "@/lib/detection-client";
+import {
+  ensureUploadFolders,
+  imageUrl,
+  syncUploadsToPublic,
+  uploadsRoot,
+} from "@/lib/upload-storage";
 import type { GalleryFolder, GalleryImage } from "@/lib/uploads";
 
-function resolveUploadRoot() {
-  const configuredRoot = process.env.CERNPIX_UPLOADS_DIR || process.env.UPLOADS_DIR;
-  if (configuredRoot && configuredRoot.trim()) {
-    return path.resolve(configuredRoot.trim());
-  }
-  return path.join(process.cwd(), "uploads");
-}
-
-function resolvePublicUploadRoot() {
-  const configuredRoot =
-    process.env.CERNPIX_PUBLIC_UPLOADS_DIR || process.env.PUBLIC_UPLOADS_DIR;
-  if (configuredRoot && configuredRoot.trim()) {
-    return path.resolve(configuredRoot.trim());
-  }
-  return path.join(process.cwd(), "public", "uploads");
-}
-
-const UPLOADS_ROOT = resolveUploadRoot();
-const PUBLIC_UPLOADS_ROOT = resolvePublicUploadRoot();
+const UPLOADS_ROOT = uploadsRoot;
 
 function isImageFile(fileName: string) {
   const ext = path.extname(fileName).toLowerCase();
   return [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"].includes(
     ext,
   );
-}
-
-async function ensureUploadFolders() {
-  await fs.mkdir(UPLOADS_ROOT, { recursive: true });
-  await fs.mkdir(PUBLIC_UPLOADS_ROOT, { recursive: true });
-}
-
-async function syncUploadsToPublic() {
-  // Copy-with-overwrite only -- deliberately not wiping PUBLIC_UPLOADS_ROOT
-  // first. This runs on every GET, and a concurrent request (dev-mode double
-  // effects, multiple tabs, a request landing mid-sync) could otherwise
-  // observe an empty directory between the wipe and the recopy, 404-ing any
-  // <img> that was mid-load.
-  await fs.mkdir(PUBLIC_UPLOADS_ROOT, { recursive: true });
-  await fs.cp(UPLOADS_ROOT, PUBLIC_UPLOADS_ROOT, { recursive: true, force: true });
 }
 
 export async function GET() {
@@ -69,7 +42,7 @@ export async function GET() {
           return {
             id: `folder-${entry.name}-${child.name}`,
             name: child.name,
-            path: `/uploads/${entry.name}/${child.name}`,
+            path: imageUrl(`${entry.name}/${child.name}`),
             flagged: detection?.flagged ?? false,
             folder: entry.name,
             detector: detection?.detector_display_name,
@@ -82,7 +55,7 @@ export async function GET() {
         folders.push({
           id: `folder-${entry.name}`,
           name: entry.name,
-          path: `/uploads/${entry.name}`,
+          path: imageUrl(entry.name),
           flagged: childImages.some((item) => item.flagged),
           children: childImages,
         });
@@ -95,7 +68,7 @@ export async function GET() {
       images.push({
         id: `root-${entry.name}`,
         name: entry.name,
-        path: `/uploads/${entry.name}`,
+        path: imageUrl(entry.name),
         flagged: detection?.flagged ?? false,
         detector: detection?.detector_display_name,
         reason: detection?.reason,
@@ -130,9 +103,11 @@ export async function POST(request: Request) {
   await ensureUploadFolders();
 
   const formData = await request.formData();
-  const files = formData.getAll("images").filter(
-    (file): file is File => file instanceof File && isImageFile(file.name),
-  );
+  const files = formData
+    .getAll("images")
+    .filter(
+      (file): file is File => file instanceof File && isImageFile(file.name),
+    );
 
   // Run detection first so the filename Flask actually saved under (it does
   // its own collision de-duplication against its own uploads/ folder) is the

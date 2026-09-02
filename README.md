@@ -10,7 +10,7 @@ CERNPIX_BACKEND_URL=http://127.0.0.1:8010
 NEXT_PUBLIC_CERNPIX_BACKEND_URL=http://127.0.0.1:8010
 ```
 
-The app accepts several common variable names so the frontend can still reach the detector service when deployed to Vercel. When you need uploads to persist outside the default project folders, set `CERNPIX_UPLOADS_DIR` and `CERNPIX_PUBLIC_UPLOADS_DIR` as well.
+The app accepts several common variable names so the frontend can still reach the detector service when deployed to Vercel. Locally, uploads are mirrored into `public/uploads`. On Vercel, the app uses the writable `/tmp` directory and serves runtime uploads through `/api/uploads/file`; `/tmp` is ephemeral, so configure `CERNPIX_UPLOADS_DIR` to point to durable external storage if uploaded files must survive deployments or cold starts.
 
 First, run the development server:
 

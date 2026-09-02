@@ -3,26 +3,14 @@ import path from "path";
 import { NextResponse } from "next/server";
 
 import { detectImages } from "@/lib/detection-client";
+import {
+  ensureUploadFolders,
+  publicUploadsRoot,
+  syncUploadsToPublic,
+  uploadsRoot,
+} from "@/lib/upload-storage";
 
-function resolveUploadRoot() {
-  const configuredRoot = process.env.CERNPIX_UPLOADS_DIR || process.env.UPLOADS_DIR;
-  if (configuredRoot && configuredRoot.trim()) {
-    return path.resolve(configuredRoot.trim());
-  }
-  return path.join(process.cwd(), "uploads");
-}
-
-function resolvePublicUploadRoot() {
-  const configuredRoot =
-    process.env.CERNPIX_PUBLIC_UPLOADS_DIR || process.env.PUBLIC_UPLOADS_DIR;
-  if (configuredRoot && configuredRoot.trim()) {
-    return path.resolve(configuredRoot.trim());
-  }
-  return path.join(process.cwd(), "public", "uploads");
-}
-
-const UPLOADS_ROOT = resolveUploadRoot();
-const PUBLIC_UPLOADS_ROOT = resolvePublicUploadRoot();
+const UPLOADS_ROOT = uploadsRoot;
 
 function isImageFile(fileName: string) {
   const ext = path.extname(fileName).toLowerCase();
@@ -59,10 +47,13 @@ async function uniqueLocalName(dir: string, fileName: string) {
 }
 
 export async function POST(request: Request) {
+  await ensureUploadFolders();
   const formData = await request.formData();
-  const files = formData.getAll("images").filter(
-    (file): file is File => file instanceof File && isImageFile(file.name),
-  );
+  const files = formData
+    .getAll("images")
+    .filter(
+      (file): file is File => file instanceof File && isImageFile(file.name),
+    );
   const folderName = slugify(
     String(formData.get("folderName") || `folder-${Date.now()}`),
   );
@@ -71,7 +62,9 @@ export async function POST(request: Request) {
   const publicFolder = path.join(PUBLIC_UPLOADS_ROOT, folderName);
 
   await fs.mkdir(targetFolder, { recursive: true });
-  await fs.mkdir(publicFolder, { recursive: true });
+  if (process.env.VERCEL !== "1") {
+    await fs.mkdir(publicFolder, { recursive: true });
+  }
 
   // Same reasoning as the root upload route: let Flask's own de-duplicated
   // filename win so the gallery's history lookup matches what's in Mongo.
@@ -87,8 +80,12 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(path.join(targetFolder, finalName), buffer);
-    await fs.writeFile(path.join(publicFolder, finalName), buffer);
+    if (process.env.VERCEL !== "1") {
+      await fs.writeFile(path.join(publicFolder, finalName), buffer);
+    }
   }
+
+  await syncUploadsToPublic();
 
   return NextResponse.json({ ok: true, folder: folderName, results });
 }
