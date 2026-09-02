@@ -4,8 +4,25 @@ import { NextResponse } from "next/server";
 
 import { detectImages } from "@/lib/detection-client";
 
-const UPLOADS_ROOT = path.join(process.cwd(), "uploads");
-const PUBLIC_UPLOADS_ROOT = path.join(process.cwd(), "public", "uploads");
+function resolveUploadRoot() {
+  const configuredRoot = process.env.CERNPIX_UPLOADS_DIR || process.env.UPLOADS_DIR;
+  if (configuredRoot && configuredRoot.trim()) {
+    return path.resolve(configuredRoot.trim());
+  }
+  return path.join(process.cwd(), "uploads");
+}
+
+function resolvePublicUploadRoot() {
+  const configuredRoot =
+    process.env.CERNPIX_PUBLIC_UPLOADS_DIR || process.env.PUBLIC_UPLOADS_DIR;
+  if (configuredRoot && configuredRoot.trim()) {
+    return path.resolve(configuredRoot.trim());
+  }
+  return path.join(process.cwd(), "public", "uploads");
+}
+
+const UPLOADS_ROOT = resolveUploadRoot();
+const PUBLIC_UPLOADS_ROOT = resolvePublicUploadRoot();
 
 function isImageFile(fileName: string) {
   const ext = path.extname(fileName).toLowerCase();

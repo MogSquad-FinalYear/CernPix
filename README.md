@@ -2,6 +2,16 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Set the backend URL before running the app in local development or on Vercel:
+
+```bash
+CERNPIX_BACKEND_URL=http://127.0.0.1:8010
+# or
+NEXT_PUBLIC_CERNPIX_BACKEND_URL=http://127.0.0.1:8010
+```
+
+The app accepts several common variable names so the frontend can still reach the detector service when deployed to Vercel. When you need uploads to persist outside the default project folders, set `CERNPIX_UPLOADS_DIR` and `CERNPIX_PUBLIC_UPLOADS_DIR` as well.
+
 First, run the development server:
 
 ```bash

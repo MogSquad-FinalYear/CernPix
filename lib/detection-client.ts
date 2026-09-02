@@ -1,4 +1,26 @@
-const BACKEND_URL = process.env.CERNPIX_BACKEND_URL || "http://127.0.0.1:8010";
+export function resolveBackendUrl() {
+  const candidates = [
+    process.env.CERNPIX_BACKEND_URL,
+    process.env.NEXT_PUBLIC_CERNPIX_BACKEND_URL,
+    process.env.BACKEND_URL,
+    process.env.NEXT_PUBLIC_BACKEND_URL,
+    process.env.CERNPIX_API_URL,
+    process.env.NEXT_PUBLIC_CERNPIX_API_URL,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      const normalized = candidate.trim().replace(/\/+$|\\+$/g, "");
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+
+  return "http://127.0.0.1:8010";
+}
+
+const BACKEND_URL = resolveBackendUrl();
 
 export type DetectionResult = {
   filename: string;
