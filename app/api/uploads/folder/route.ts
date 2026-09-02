@@ -2,6 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
 
+import { detectImages } from "@/lib/detection-client";
+
 const UPLOADS_ROOT = path.join(process.cwd(), "uploads");
 const PUBLIC_UPLOADS_ROOT = path.join(process.cwd(), "public", "uploads");
 
@@ -20,9 +22,30 @@ function slugify(value: string) {
     .toLowerCase();
 }
 
+async function uniqueLocalName(dir: string, fileName: string) {
+  const safeName = fileName.replace(/[\\/]/g, "_");
+  const ext = path.extname(safeName);
+  const base = path.basename(safeName, ext);
+
+  let candidate = safeName;
+  let n = 1;
+  while (
+    await fs
+      .access(path.join(dir, candidate))
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    candidate = `${base}_${n}${ext}`;
+    n += 1;
+  }
+  return candidate;
+}
+
 export async function POST(request: Request) {
   const formData = await request.formData();
-  const files = formData.getAll("images");
+  const files = formData.getAll("images").filter(
+    (file): file is File => file instanceof File && isImageFile(file.name),
+  );
   const folderName = slugify(
     String(formData.get("folderName") || `folder-${Date.now()}`),
   );
@@ -33,16 +56,22 @@ export async function POST(request: Request) {
   await fs.mkdir(targetFolder, { recursive: true });
   await fs.mkdir(publicFolder, { recursive: true });
 
-  for (const rawFile of files) {
-    if (!(rawFile instanceof File)) continue;
-    if (!isImageFile(rawFile.name)) continue;
+  // Same reasoning as the root upload route: let Flask's own de-duplicated
+  // filename win so the gallery's history lookup matches what's in Mongo.
+  const results = await detectImages(files, folderName);
 
-    const buffer = Buffer.from(await rawFile.arrayBuffer());
-    const safeName = rawFile.name.replace(/[\\/]/g, "_");
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const detected = results[i];
+    const finalName =
+      detected && !detected.error && detected.filename
+        ? detected.filename
+        : await uniqueLocalName(targetFolder, file.name);
 
-    await fs.writeFile(path.join(targetFolder, safeName), buffer);
-    await fs.writeFile(path.join(publicFolder, safeName), buffer);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await fs.writeFile(path.join(targetFolder, finalName), buffer);
+    await fs.writeFile(path.join(publicFolder, finalName), buffer);
   }
 
-  return NextResponse.json({ ok: true, folder: folderName });
+  return NextResponse.json({ ok: true, folder: folderName, results });
 }

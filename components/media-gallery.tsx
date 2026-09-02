@@ -407,13 +407,13 @@ export function MediaGalleryPage({
                           <div className="mt-2 space-y-1">
                             <div>
                               <span className="text-blue-200">
-                                Detector name:
+                                Detector:
                               </span>{" "}
-                              "Universal Detector"
+                              {image.detector ?? "Unknown"}
                             </div>
                             <div>
                               <span className="text-blue-200">Reason:</span>{" "}
-                              lorem ipsum
+                              {image.reason ?? "No reason recorded."}
                             </div>
                           </div>
                         </div>
