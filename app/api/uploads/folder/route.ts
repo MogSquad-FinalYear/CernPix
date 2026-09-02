@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   );
 
   const targetFolder = path.join(UPLOADS_ROOT, folderName);
-  const publicFolder = path.join(PUBLIC_UPLOADS_ROOT, folderName);
+  const publicFolder = path.join(publicUploadsRoot, folderName);
 
   await fs.mkdir(targetFolder, { recursive: true });
   if (process.env.VERCEL !== "1") {
